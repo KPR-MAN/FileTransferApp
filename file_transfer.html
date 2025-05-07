@@ -1,0 +1,209 @@
+<!-- Improved File Transfer HTML Frontend -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Transfer App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-p0jHjvL1QqzYJ4oFqjkE5VGeHe6y8KrM7y9Tq8xZJzQ8+q6i+bZkLh7K6eBKZeyzqhs35n6DhP+tDJxsfj9m0w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        :root {
+            --primary-color: #1e1e2e;
+            --secondary-color: #2a2a3c;
+            --accent-color: #7289da;
+            --text-color: #e0e0e0;
+            --hover-color: #9caae6;
+            --toast-bg: #444;
+            --toast-text: #fff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--primary-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: auto;
+            padding: 20px;
+            flex-grow: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: var(--accent-color);
+            margin: 0 0 10px;
+        }
+
+        .files-section,
+        .upload-section {
+            background-color: var(--secondary-color);
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+
+        .file-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .file-name {
+            flex-grow: 1;
+        }
+
+        .download-btn {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        .upload-section input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            background: var(--accent-color);
+            padding: 10px 20px;
+            display: inline-block;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #selected-file {
+            margin-top: 10px;
+        }
+
+        .upload-btn {
+            background: var(--hover-color);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--toast-bg);
+            color: var(--toast-text);
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📤 File Transfer App</h1>
+            <p>Upload and download files on the local network</p>
+        </header>
+
+        <section class="files-section">
+            <h2>📁 Files</h2>
+            <div id="files-list">Loading files...</div>
+        </section>
+
+        <section class="upload-section">
+            <h2>📎 Upload a File</h2>
+            <form id="upload-form">
+                <label for="file-input" class="file-label">Choose File</label>
+                <input type="file" id="file-input">
+                <div id="selected-file">No file selected</div>
+                <button type="submit" class="upload-btn">Upload</button>
+            </form>
+        </section>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const fileInput = document.getElementById("file-input");
+        const selectedFile = document.getElementById("selected-file");
+        const filesList = document.getElementById("files-list");
+        const toast = document.getElementById("toast");
+
+        fileInput.addEventListener("change", () => {
+            if (fileInput.files.length > 0) {
+                selectedFile.textContent = `Selected: ${fileInput.files[0].name}`;
+            } else {
+                selectedFile.textContent = "No file selected";
+            }
+        });
+
+        document.getElementById("upload-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            if (!fileInput.files.length) return;
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(res => res.text())
+            .then(id => {
+                showToast("Upload complete. Waiting for approval...");
+                setTimeout(loadFiles, 2000);
+            })
+            .catch(() => showToast("Upload failed."));
+        });
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.style.display = "block";
+            setTimeout(() => toast.style.display = "none", 3000);
+        }
+
+        function loadFiles() {
+            fetch("/available-files")
+                .then(res => res.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        filesList.innerHTML = "<p>No files available.</p>";
+                        return;
+                    }
+                    filesList.innerHTML = data.map(file => `
+                        <div class="file-item">
+                            <div class="file-name"><i class="fas fa-file"></i> ${file.name}</div>
+                            <div>${file.size}</div>
+                            <a class="download-btn" href="/download/${file.id}">Download</a>
+                        </div>
+                    `).join("");
+                });
+        }
+
+        window.addEventListener("DOMContentLoaded", loadFiles);
+        setInterval(loadFiles, 30000); // Auto-refresh every 30s
+    </script>
+</body>
+</html>
